@@ -1,4 +1,4 @@
-# RMT4ELM
+# RMT4LS-SVM
 *A Random Matrix Approach to Least Squares SVM*
 
 This page contains a simple demo using [Python 3](https://www.python.org/) of the theoretical results  in the following paper:
