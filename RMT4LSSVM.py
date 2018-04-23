@@ -18,7 +18,7 @@ from sklearn.datasets import fetch_mldata
 
 # In[2]:
 
-def get_data(testcase,n,n_test,prop,means=None,covs=None):
+def get_data(testcase,n,n_test,prop,selected_target=None,means=None,covs=None,):
     rng = np.random
 
     # different cases for data
@@ -28,7 +28,7 @@ def get_data(testcase,n,n_test,prop,means=None,covs=None):
         X_train_full, X_test_full = X[:60000], X[60000:]
         y_train_full, y_test_full = y[:60000], y[60000:]
 
-        selected_target = [1,7]
+        p = 784
         K=len(selected_target)
         X_train = np.array([]).reshape(p,0)
         X_test = np.array([]).reshape(p,0)        
@@ -71,12 +71,12 @@ def get_data(testcase,n,n_test,prop,means=None,covs=None):
 
 # ### Generate Kernel function $f$
 
-# In[184]:
+# In[3]:
 
 def get_kernel(kernel,z,derivs=None,tau=None,sigma2=None):
     if kernel in ['poly','poly_zero']:
         if derivs is None:
-            print('Error: Try to use poly kernel without derivs given!\n')
+            print('Error: Try to use poly kernel: please give derivatives!\n')
         else:
             coeffs = np.zeros(3)
             for i in range(3):
@@ -84,7 +84,7 @@ def get_kernel(kernel,z,derivs=None,tau=None,sigma2=None):
             f = np.polyval(coeffs,(z-tau))
     elif kernel is 'gauss':
         if sigma2 is None:
-            print('Error: Try to use Gaussian kernel without sigma given!\n')
+            print('Error: Try to use Gaussian kernel: please give sigma2!\n')
         else:
             f = np.exp(-z/(2*sigma2))
         
@@ -93,7 +93,7 @@ def get_kernel(kernel,z,derivs=None,tau=None,sigma2=None):
 
 # ### Get statistics of MNIST data
 
-# In[163]:
+# In[4]:
 
 def get_stat(X,prop):
     p = X_train.shape[0]
@@ -115,33 +115,32 @@ def get_stat(X,prop):
 
 # ## Main code
 
-# In[185]:
+# In[5]:
 
-testcase = 'mixed'# testcase for simulation, among 'iid','means','var','orth','mixed','MNIST'
-kernel = 'poly_zero'  # kernel used for LS-SVM, among 'gauss', 'poly', 'poly_zero'
+testcase = 'MNIST'# testcase for simulation, among 'iid','means','var','orth','mixed','MNIST'
+kernel = 'gauss'  # kernel used for LS-SVM, among 'gauss', 'poly', 'poly_zero'
 
-n = 1024 # number of training samples 
-n_test = 512 # number of test simples
+n = 256 # number of training samples 
+n_test = 1024 # number of test simples
 p = 128 # dimension of data
-prop = [.5,.5] # two-class problem
+prop = [.25,.75] # two-class problem
 k = len(prop)
 
 gamma = 1
 
 
-loops = 10        # Number of generations of W to be averaged over
+loops = 50        # Number of generations of W to be averaged over
 
 g=np.zeros((loops,n_test))
 
-
 rng = np.random
-idx = 0
 for loop in range(loops):    
     
     ## Generate X_train,X_test,y_train,y_test
     if testcase is 'MNIST':
         p=784
-        X_train,X_test,y_train,y_test = get_data(testcase,n,n_test,prop)
+        selected_target = [3,8]
+        X_train,X_test,y_train,y_test = get_data(testcase,n,n_test,prop,selected_target)
     else:    
         means=[]
         covs=[]
@@ -186,7 +185,6 @@ for loop in range(loops):
         derivs = [3, 0, 2]
     
     K = get_kernel(kernel, XX_train.diagonal(offset=0).reshape(n,1)@np.ones(n).reshape(1,n)+np.ones(n).reshape(n,1)@XX_train.diagonal(offset=0).T.reshape(1,n)-2*XX_train, derivs, tau, sigma2)
-    # print(K.shape)
 
     S = K + n/gamma*np.eye(n)
     invS_y = scipy.linalg.solve(S,y_train)
@@ -194,10 +192,11 @@ for loop in range(loops):
 
     b = invS_y.sum()/invS_1.sum()
     alpha = invS_y - invS_1*b
-
-    g[idx] = alpha.T@get_kernel(kernel, XX_train.diagonal(offset=0).reshape(n,1)@(np.ones(n_test).reshape(1,n_test))+np.ones(n).reshape(n,1)@XX_test.diagonal(offset=0).reshape(1,n_test)-2*X_train.T@X_test/p, derivs, tau, sigma2)+b
+    g[loop,:] = alpha.T@get_kernel(kernel, XX_train.diagonal(offset=0).reshape(n,1)@(np.ones(n_test).reshape(1,n_test))+np.ones(n).reshape(n,1)@XX_test.diagonal(offset=0).reshape(1,n_test)-2*X_train.T@X_test/p, derivs, tau, sigma2)+b
     
-    idx += 1
+    # if we remove b
+    # alpha = invS_y
+    # g[idx] = alpha.T@get_kernel(kernel, XX_train.diagonal(offset=0).reshape(n,1)@(np.ones(n_test).reshape(1,n_test))+np.ones(n).reshape(n,1)@XX_test.diagonal(offset=0).reshape(1,n_test)-2*X_train.T@X_test/p, derivs, tau, sigma2)
     
 # Computation for theoritical means and var
 if kernel is 'gauss':
@@ -225,22 +224,24 @@ var_th = 8*gamma**2*(prop[0]*prop[1])**2*np.array([V11+V21+V31, V12+V22+V32])
 
 # ### Plots
 
-# In[186]:
+# In[6]:
 
-# sorry for this stupid transpose here
-g = g.T
-g1 = g[range(int(n_test*prop[0])),:]
-g2 = g[int(n_test*prop[0]):,:]
+g_mean = np.mean(g,0)
+    
+g1 = g_mean[range(int(n_test*prop[0]))]
+g2 = g_mean[int(n_test*prop[0]):]
 
 xs1 = np.linspace(min(g1.flatten()),max(g1.flatten()),30)
 xs2 = np.linspace(min(g2.flatten()),max(g2.flatten()),30)
+step1 = xs1[1]-xs1[0]
+step2 = xs2[1]-xs2[0]
 g_th1 = scipy.stats.norm.pdf((xs1-mean_th[0])/np.sqrt(var_th[0])).reshape(30,1)
 g_th2 = scipy.stats.norm.pdf((xs2-mean_th[1])/np.sqrt(var_th[1])).reshape(30,1)
 
 n1, bins1, patches1 ,= plt.hist(g1.flatten(), 30, facecolor='blue', alpha=0.75)
 n2, bins2, patches2 ,= plt.hist(g2.flatten(), 30, facecolor='red', alpha=0.75)
 
-pl1 ,=plt.plot(xs1,g_th1*n_test,'green')
-pl2 ,=plt.plot(xs2,g_th2*n_test,'purple')
+pl1 ,=plt.plot(xs1,g_th1*n_test*loops*prop[0]*step1,'green')
+pl2 ,=plt.plot(xs2,g_th2*n_test*loops*prop[1]*step2,'purple')
 plt.show()
 
