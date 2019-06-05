@@ -124,9 +124,9 @@ def get_stat(X,prop):
 testcase = 'means'# testcase for simulation, among 'iid','means','var','orth','mixed','MNIST'
 kernel = 'gauss'  # kernel used for LS-SVM, among 'gauss', 'poly', 'poly_zero'
 
-n = 256 # number of training samples 
+n = 512 # number of training samples 
 n_test = 1024 # number of test simples
-p = 128 # dimension of data
+p = 256 # dimension of data
 prop = [.25,.75] # two-class problem
 k = len(prop)
 
@@ -216,15 +216,16 @@ if testcase is 'MNIST':
 t1 = np.trace(covs[0]-prop[0]*covs[0]-prop[1]*covs[1])/np.sqrt(p)
 t2 = np.trace(covs[1]-prop[0]*covs[0]-prop[1]*covs[1])/np.sqrt(p)
     
-D = -2*derivs[1]*(np.linalg.norm(means[1]-means[0]))**2/p + derivs[2]*(t1-t2)**2/p + 2*derivs[2]*(np.trace((covs[0]-covs[1])**2))/(p**2)
+D = -2*derivs[1]*(np.linalg.norm(means[1]-means[0]))**2/p + derivs[2]*(t1-t2)**2/p + 2*derivs[2]*(np.trace((covs[0]-covs[1])@(covs[0]-covs[1])))/(p**2)
 
 mean_th = (prop[1]-prop[0])*np.array([1.0,1.0])+2*prop[0]*prop[1]*gamma*D*np.array([-prop[1],prop[0]])
-V11 = (t2-t1)**2*derivs[2]**2*np.trace(covs[0]**2)/(p**3)
-V12 = (t2-t1)**2*derivs[2]**2*np.trace(covs[1]**2)/(p**3)
+
+V11 = (t2-t1)**2*derivs[2]**2*np.trace(covs[0]@covs[0])/(p**3)
+V12 = (t2-t1)**2*derivs[2]**2*np.trace(covs[1]@covs[1])/(p**3)
 V21 = 2*derivs[1]**2*(means[1]-means[0]).T@covs[0]@(means[1]-means[0])/(p**2)
 V22 = 2*derivs[1]**2*(means[1]-means[0]).T@covs[1]@(means[1]-means[0])/(p**2)
-V31 = 2*derivs[1]**2*(np.trace(covs[0]**2)/prop[0]+np.trace(covs[0]*covs[1])/prop[1])/(n*p**2)
-V32 = 2*derivs[1]**2*(np.trace(covs[0]*covs[1])/prop[0]+np.trace(covs[1]**2)/prop[1])/(n*p**2)
+V31 = 2*derivs[1]**2*(np.trace(covs[0]@covs[0])/prop[0]+np.trace(covs[0]@covs[1])/prop[1])/(n*p**2)
+V32 = 2*derivs[1]**2*(np.trace(covs[0]@covs[1])/prop[0]+np.trace(covs[1]@covs[1])/prop[1])/(n*p**2)
 var_th = 8*gamma**2*(prop[0]*prop[1])**2*np.array([V11+V21+V31, V12+V22+V32])
 
 
